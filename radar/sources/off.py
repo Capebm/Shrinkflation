@@ -120,27 +120,49 @@ def to_observation(p: dict, observed_at: str) -> Observation | None:
     return obs
 
 
+def _get_product(url: str) -> dict:
+    # one quick retry only: a product that fails is simply tried again next week
+    return json.loads(http.get(url, retries=2))
+
+
 def add_ingredients(pairs: list[tuple[Observation, object]], cache_path: Path, *, pause: float = 0.7,
-                    get_json: Callable[[str], dict] = http.get_json) -> tuple[int, int]:
-    """Fill in ingredients and declared percentages. Returns (requests made, failures)."""
+                    get_json: Callable[[str], dict] = _get_product, budget_s: float = 15 * 60,
+                    max_failures: int = 25) -> tuple[int, int]:
+    """Fill in ingredients and declared percentages. Returns (requests made, failures).
+
+    Stops fetching after ``budget_s`` seconds or ``max_failures`` failures; the cache
+    keeps what was fetched, so the next weekly run carries on where this one stopped.
+    Products not fetched keep the ingredients cached earlier, if any.
+    """
     cache: dict[str, dict] = json.loads(cache_path.read_text(encoding="utf-8")) if cache_path.exists() else {}
     fetched = failed = 0
+    deadline = time.monotonic() + budget_s
     for obs, modified in pairs:
         if obs.ingredients:
             continue
         entry = cache.get(obs.ean)
-        if not entry or entry.get("t") != modified:
+        stale = not entry or entry.get("t") != modified
+        if stale and time.monotonic() < deadline and failed < max_failures:
             try:
                 product = get_json(PRODUCT_URL.format(code=obs.ean) + "?fields=" + PRODUCT_FIELDS).get("product") or {}
-            except Exception:
+            except Exception as exc:
                 failed += 1
-                continue
-            fetched += 1
-            text = product.get("ingredients_text_pt") or product.get("ingredients_text") or ""
-            entry = cache[obs.ean] = {"t": modified, "text": text,
-                                      "quid": {**extract_quid(text), **quid_from_off(product.get("ingredients"))}}
-            if pause:
-                time.sleep(pause)
+                print(f"ingredientes {obs.ean}: {exc}", file=sys.stderr)
+                product = None
+            if product is None:
+                if not entry:
+                    continue
+            else:
+                fetched += 1
+                text = product.get("ingredients_text_pt") or product.get("ingredients_text") or ""
+                entry = cache[obs.ean] = {"t": modified, "text": text,
+                                          "quid": {**extract_quid(text), **quid_from_off(product.get("ingredients"))}}
+                if fetched % 100 == 0:
+                    print(f"ingredientes: {fetched} produtos lidos", file=sys.stderr, flush=True)
+                if pause:
+                    time.sleep(pause)
+        elif not entry:
+            continue
         obs.ingredients = entry["text"] or None
         obs.quid = entry["quid"]
     cache_path.parent.mkdir(parents=True, exist_ok=True)
@@ -173,7 +195,8 @@ def collect(categories: list[str], observed_at: str, max_pages: int = 10,
                 seen[obs.ean] = obs
                 modified[obs.ean] = product.get("last_modified_t")
     if ingredient_cache is not None:
+        kwargs = {} if get_json is http.get_json else {"get_json": get_json}
         fetched, errors = add_ingredients([(o, modified[o.ean]) for o in seen.values()], ingredient_cache,
-                                          get_json=get_json, pause=min(pause, 0.7))
+                                          pause=min(pause, 0.7), **kwargs)
         print(f"ingredientes: {fetched} pedidos ao Open Food Facts, {errors} falhas", file=sys.stderr)
     return list(seen.values()), failed

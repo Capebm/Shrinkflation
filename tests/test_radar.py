@@ -154,6 +154,18 @@ class SourceTests(unittest.TestCase):
             off.collect(["en:sausages"], "2026-10-20", pause=0, get_json=fake, ingredient_cache=cache)
             self.assertEqual(sum("/api/v2/product/" in u for u in calls), 2)
 
+    def test_ingredient_fetch_stops_after_too_many_failures(self):
+        pairs = [(Observation(observed_at="2026-10-06", source="off", ean=str(5600000000000 + i)), 1) for i in range(10)]
+        calls = []
+
+        def down(url):
+            calls.append(url)
+            raise OSError("503")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fetched, failed = off.add_ingredients(pairs, Path(tmp) / "c.json", pause=0, get_json=down, max_failures=3)
+        self.assertEqual((fetched, failed, len(calls)), (0, 3, 3))
+
     def test_category_skipped_when_both_services_fail(self):
         def down(url):
             raise OSError("503")
