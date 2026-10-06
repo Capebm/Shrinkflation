@@ -29,7 +29,11 @@ jobs:
         run: python -m unittest discover -s tests -t .
       - name: Open Food Facts
         run: python -m radar recolher off --paginas "${{ inputs.paginas || '10' }}"
+      - name: Open Prices (preços colaborativos)
+        continue-on-error: true
+        run: python -m radar recolher precos
       - name: Lojas online (data/fontes/lojas.csv)
+        continue-on-error: true
         run: |
           if [ "$(wc -l < data/fontes/lojas.csv)" -gt 1 ]; then
             python -m radar recolher lojas
@@ -42,7 +46,7 @@ jobs:
         run: |
           git config user.name "radar-bot"
           git config user.email "radar-bot@users.noreply.github.com"
-          git add data/historico.jsonl data/vistos.json data/eventos.json site/radar.html
+          git add data/historico.jsonl data/vistos.json data/precos_openprices.jsonl data/eventos.json site/radar.html
           if git diff --cached --quiet; then
             echo "Sem alterações"
           else

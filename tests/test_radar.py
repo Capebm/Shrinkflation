@@ -7,7 +7,8 @@ from radar.composition import extract_quid
 from radar.detect import detect, similarity
 from radar.model import Observation
 from radar.quantity import Quantity, parse_quantity
-from radar.sources import csvfile, lojas, off
+from radar.sources import csvfile, lojas, off, openprices
+from radar.sources.openprices import PricePoint
 from radar.store import Store
 
 FIX = Path(__file__).parent / "fixtures"
@@ -107,7 +108,12 @@ class StoreTests(unittest.TestCase):
 class SourceTests(unittest.TestCase):
     def test_open_food_facts_mapping(self):
         payload = json.loads((FIX / "off_search.json").read_text(encoding="utf-8"))
-        result = off.collect(["en:chocolates"], "2026-10-06", get_json=lambda url: payload)
+        def fake(url):
+            if "search.openfoodfacts.org" in url:
+                raise OSError("503")
+            return payload
+        result, failed = off.collect(["en:chocolates"], "2026-10-06", get_json=fake, pause=0)
+        self.assertEqual(failed, [])
         by_ean = {o.ean: o for o in result}
         self.assertEqual(set(by_ean), {"5601234567890", "5609999999999"})
         choc = by_ean["5601234567890"]
@@ -115,6 +121,25 @@ class SourceTests(unittest.TestCase):
         self.assertEqual(choc.quid, {"avelãs": 12.0, "leite em pó": 18.0})
         self.assertEqual(choc.nutrition["proteína"], 7.1)
         self.assertEqual((by_ean["5609999999999"].amount, by_ean["5609999999999"].unit), (400, "g"))
+
+    def test_search_a_licious_first(self):
+        hit = {"code": "5601234567890", "product_name": {"main": "Choco", "pt": "Chocolate"},
+               "brands": ["xx:marca-teste"], "quantity": "90 g",
+               "ingredients_text": {"main": "açúcar, avelãs (12%)"}, "nutriments": {"proteins_100g": 7}}
+        urls = []
+        result, failed = off.collect(["en:chocolates"], "2026-10-06", pause=0,
+                                     get_json=lambda u: urls.append(u) or {"hits": [hit], "page_count": 1})
+        [o] = result
+        self.assertEqual(len(urls), 1)
+        self.assertIn("search.openfoodfacts.org", urls[0])
+        self.assertIn("en%3Aportugal", urls[0])
+        self.assertEqual((o.name, o.brand, o.amount, o.quid), ("Chocolate", "Marca Teste", 90, {"avelãs": 12.0}))
+
+    def test_category_skipped_when_both_services_fail(self):
+        def down(url):
+            raise OSError("503")
+        result, failed = off.collect(["en:chocolates", "en:coffees"], "2026-10-06", pause=0, get_json=down)
+        self.assertEqual((result, failed), ([], ["en:chocolates", "en:coffees"]))
 
     def test_search_url_filters_portugal(self):
         urls = []
@@ -142,6 +167,57 @@ class SourceTests(unittest.TestCase):
             store.add(csvfile.read(ROOT / "data/exemplo/observacoes.csv"))
             kinds = sorted(e.kind for e in detect(store.history(), store.seen()))
         self.assertEqual(kinds, ["encolhimento"] * 3 + ["receita_nutricao"] + ["receita_quid"] * 2 + ["troca_codigo"])
+
+
+class OpenPricesTests(unittest.TestCase):
+    def test_fetch_keeps_full_prices_from_portugal(self):
+        payload = json.loads((FIX / "openprices.json").read_text(encoding="utf-8"))
+        urls = []
+        points = openprices.fetch(["5600000000017"], "2025-01-01", pause=0,
+                                  get_json=lambda u: urls.append(u) or payload)
+        self.assertEqual(points, [PricePoint(101, "5600000000017", "2026-01-10", 1.49, "EUR", "Supermercado A, Lisboa", "PT")])
+        self.assertIn("product_code__in=5600000000017", urls[0])
+        self.assertIn("date__gte=2025-01-01", urls[0])
+
+    def test_batches_and_pages(self):
+        urls = []
+        def fake(url):
+            urls.append(url)
+            return {"items": [], "page": 1, "pages": 2 if "page=1" in url else 2}
+        openprices.fetch([str(5600000000000 + i) for i in range(60)], "2025-01-01", pause=0, get_json=fake)
+        self.assertEqual(len(urls), 4)  # 2 batches of up to 50 codes x 2 pages
+
+    def test_store_is_unique_by_id(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = openprices.PriceStore(Path(tmp))
+            p = PricePoint(1, "1", "2026-01-01", 1.0, "EUR", "Loja", "PT")
+            self.assertEqual(store.add([p]), 1)
+            self.assertEqual(store.add([p]), 0)
+            self.assertEqual(store.load(), [p])
+
+    def test_crowd_prices_fill_in_unknown_shelf_price(self):
+        history = [obs("2026-03-01", price=None), obs("2026-06-01", qty="90 g", price=None)]
+        crowd = [PricePoint(1, "5600000000017", "2026-01-10", 1.49, "EUR", "A", "PT"),
+                 PricePoint(2, "5600000000017", "2026-02-20", 1.49, "EUR", "B", "PT"),
+                 PricePoint(3, "5600000000017", "2026-04-01", 9.99, "EUR", "A", "PT"),  # size unknown: ignored
+                 PricePoint(4, "5600000000017", "2026-06-15", 1.59, "EUR", "A", "PT")]
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Store(Path(tmp))
+            store.add(history)
+            [e] = detect(store.history(), store.seen(), crowd)
+        self.assertTrue(e.price_known)
+        self.assertEqual((e.details["price_before"], e.details["price_after"]), (1.49, 1.59))
+        self.assertAlmostEqual(e.change_pct, 18.6, places=1)
+        self.assertIn("Open Prices", e.summary)
+
+    def test_crowd_prices_can_clear_a_false_alarm(self):
+        history = [obs("2026-03-01", qty="400 g", price=None), obs("2026-06-01", qty="350 g", price=None)]
+        crowd = [PricePoint(1, "5600000000017", "2026-02-01", 2.00, "EUR", "A", "PT"),
+                 PricePoint(2, "5600000000017", "2026-06-10", 1.75, "EUR", "A", "PT")]
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Store(Path(tmp))
+            store.add(history)
+            self.assertEqual(detect(store.history(), store.seen(), crowd), [])
 
 
 if __name__ == "__main__":

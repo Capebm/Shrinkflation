@@ -21,7 +21,8 @@ Não são alertas: subir o preço sem mexer na embalagem, ou reduzir a embalagem
 
 ### Fontes
 
-- **Open Food Facts** (`recolher off`): produtos vendidos em Portugal, com quantidade, ingredientes e tabela nutricional (licença ODbL). Não tem preços.
+- **Open Food Facts** (`recolher off`): produtos vendidos em Portugal, com quantidade, ingredientes e tabela nutricional (licença ODbL). Não tem preços. A pesquisa usa primeiro o Search-a-licious (`search.openfoodfacts.org`) e, se falhar, a pesquisa antiga (`/api/v2/search`), que devolveu 503 na primeira execução. Uma categoria que falhe nos dois serviços é ignorada nessa semana.
+- **Open Prices** (`recolher precos`): preços colaborativos do Open Food Facts, com talão ou foto como prova (ODbL). O Open Prices não guarda o tamanho da embalagem na data do preço, por isso não forma uma série própria. Serve para preencher o preço antes e depois de uma redução detetada no Open Food Facts: mediana de até 5 preços do formato antigo antes da mudança e de até 5 do formato novo depois dela. Só entram preços sem desconto, em euros e de lojas em Portugal; os preços datados entre as duas observações são ignorados. Isto também elimina falsos alarmes quando o preço desceu na proporção.
 - **Lojas online** (`recolher lojas`): páginas de produto listadas em `data/fontes/lojas.csv` (`retalhista,url`), lidas através do JSON-LD `Product` do schema.org. Respeita o robots.txt e faz uma pausa de 3 s entre pedidos. **Ainda não foi testado contra as lojas portuguesas**: páginas montadas só no browser ou protegidas contra robôs são ignoradas e aparecem no registo.
 - **CSV** (`recolher csv FICHEIRO`): talões, fotos de prateleira, casos da DECO ou dados de parceiros. Colunas: `data,retalhista,ean,marca,nome,quantidade,preco,url,ingredientes,proteina`.
 
@@ -32,6 +33,7 @@ python -m radar exemplo                    # demonstração com dados fictícios
 python -m radar recolher off --paginas 10  # Open Food Facts
 python -m radar recolher lojas
 python -m radar recolher csv talões.csv
+python -m radar recolher precos            # Open Prices, para os produtos já no histórico
 python -m radar detetar                    # data/eventos.json + site/radar.html
 python -m unittest discover -s tests -t .
 ```
@@ -42,6 +44,7 @@ As opções globais vêm antes do comando: `python -m radar --data 2026-10-06 re
 
 - `data/historico.jsonl`: uma observação por linha, gravada só quando algo mudou, para o histórico caber no git.
 - `data/vistos.json`: primeira e última data em que cada produto foi visto, usada para detetar trocas de código.
+- `data/precos_openprices.jsonl`: preços do Open Prices, um por linha, sem repetições.
 - `data/eventos.json`: os casos detetados.
 
 ### Recolha automática

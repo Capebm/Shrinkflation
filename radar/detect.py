@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import hashlib
 import re
+import statistics
 from collections import defaultdict
-from dataclasses import asdict, dataclass, field
-from datetime import date
+from dataclasses import asdict, dataclass, field, replace
+from datetime import date, timedelta
 
 from .composition import normalise
 from .model import Observation
+from .sources.openprices import PricePoint
 
 QTY_TOLERANCE = 0.005      # ignore rounding noise below 0.5%
 MIN_UNIT_PRICE_RISE = 3.0  # % rise in unit price that makes a shrink an alert
@@ -16,6 +18,8 @@ MIN_QUID_DROP = 2.0        # percentage points
 MIN_NUTRIENT_DROP = 0.10   # relative drop
 SWAP_WINDOW_DAYS = 120
 SWAP_MIN_SIMILARITY = 0.6
+PRICE_WINDOW_DAYS = 365    # how far from a size change Open Prices points are still used
+PRICE_POINTS = 5           # median of up to this many prices on each side
 
 KIND_LABELS = {
     "encolhimento": "Embalagem encolheu",
@@ -72,11 +76,15 @@ def _qty(o: Observation) -> str:
     return f"{amount:g} {o.unit}"
 
 
-def _shrink(a: Observation, b: Observation, kind: str) -> Event | None:
+def _shrink(a: Observation, b: Observation, kind: str,
+            prices: dict[str, list[PricePoint]] | None = None) -> Event | None:
     if not (a.amount and b.amount) or a.unit != b.unit:
         return None
     if b.amount >= a.amount * (1 - QTY_TOLERANCE):
         return None
+    price_note = ""
+    if (a.price is None or b.price is None) and prices:
+        a, b, price_note = _with_crowd_prices(a, b, prices)
     qty_drop = (1 - b.amount / a.amount) * 100
     price_known = a.price is not None and b.price is not None
     if price_known:
@@ -85,14 +93,32 @@ def _shrink(a: Observation, b: Observation, kind: str) -> Event | None:
             return None  # the price fell along with the size: not hidden inflation
         cur = {"EUR": "€", None: "€"}.get(b.currency, b.currency)
         summary = (f"{_qty(a)} → {_qty(b)} (−{_fmt(qty_drop)}%); preço {_money(a.price)} → {_money(b.price)} {cur}; "
-                   f"preço por unidade +{_fmt(change)}%")
+                   f"preço por unidade +{_fmt(change)}%{price_note}")
     else:
         change = (a.amount / b.amount - 1) * 100  # implied rise if the shelf price stayed the same
         summary = f"{_qty(a)} → {_qty(b)} (−{_fmt(qty_drop)}%); preço desconhecido nesta fonte"
     return Event(kind, b.brand or a.brand, b.name or a.name, b.source, b.retailer, a.ean, b.ean,
                  a.observed_at, b.observed_at, summary, round(change, 1), price_known,
                  {"qty_before": a.amount, "qty_after": b.amount, "unit": b.unit,
-                  "price_before": a.price, "price_after": b.price}, b.url or a.url)
+                  "price_before": a.price, "price_after": b.price,
+                  "price_source": "Open Prices" if price_note else None}, b.url or a.url)
+
+
+def _with_crowd_prices(a: Observation, b: Observation, prices: dict[str, list[PricePoint]]
+                       ) -> tuple[Observation, Observation, str]:
+    """Median Open Prices price of the old pack before the change and of the new pack after it.
+
+    Prices dated between the two observations are skipped: the pack size on those dates is unknown.
+    """
+    start = (date.fromisoformat(a.observed_at) - timedelta(days=PRICE_WINDOW_DAYS)).isoformat()
+    end = (date.fromisoformat(b.observed_at) + timedelta(days=PRICE_WINDOW_DAYS)).isoformat()
+    before = [p.price for p in prices.get(a.ean, []) if start <= p.date <= a.observed_at][-PRICE_POINTS:]
+    after = [p.price for p in prices.get(b.ean, []) if b.observed_at <= p.date <= end][:PRICE_POINTS]
+    if not (before and after):
+        return a, b, ""
+    note = f" (mediana de {len(before)} e {len(after)} preços no Open Prices)"
+    return (replace(a, price=round(statistics.median(before), 2), currency="EUR"),
+            replace(b, price=round(statistics.median(after), 2), currency="EUR"), note)
 
 
 def _quid(a: Observation, b: Observation) -> list[Event]:
@@ -136,7 +162,11 @@ def _days(a: str, b: str) -> int:
     return (date.fromisoformat(b) - date.fromisoformat(a)).days
 
 
-def detect(history: list[Observation], seen: dict[str, dict[str, str]]) -> list[Event]:
+def detect(history: list[Observation], seen: dict[str, dict[str, str]],
+           crowd_prices: list[PricePoint] | None = None) -> list[Event]:
+    prices: dict[str, list[PricePoint]] = defaultdict(list)
+    for point in sorted(crowd_prices or [], key=lambda p: (p.date, p.id)):
+        prices[point.ean].append(point)
     by_key: dict[str, list[Observation]] = defaultdict(list)
     for obs in history:
         by_key[obs.key].append(obs)
@@ -145,18 +175,19 @@ def detect(history: list[Observation], seen: dict[str, dict[str, str]]) -> list[
     for series in by_key.values():
         series.sort(key=lambda o: o.observed_at)
         for a, b in zip(series, series[1:]):
-            ev = _shrink(a, b, "encolhimento")
+            ev = _shrink(a, b, "encolhimento", prices)
             if ev:
                 events.append(ev)
             events += _quid(a, b)
             events += _nutrition(a, b)
 
-    events += _code_swaps(by_key, seen)
+    events += _code_swaps(by_key, seen, prices)
     uniq = {e.id: e for e in events}
     return sorted(uniq.values(), key=lambda e: (-(e.change_pct or 0), e.date_after))
 
 
-def _code_swaps(by_key: dict[str, list[Observation]], seen: dict[str, dict[str, str]]) -> list[Event]:
+def _code_swaps(by_key: dict[str, list[Observation]], seen: dict[str, dict[str, str]],
+                prices: dict[str, list[PricePoint]]) -> list[Event]:
     """A product code disappears and a similar product from the same brand appears, smaller."""
     last_run: dict[str, str] = {}
     for key, span in seen.items():
@@ -178,7 +209,7 @@ def _code_swaps(by_key: dict[str, list[Observation]], seen: dict[str, dict[str, 
             new = by_key[new_key][0]
             if normalise(old.brand) != normalise(new.brand) or similarity(old.name, new.name) < SWAP_MIN_SIMILARITY:
                 continue
-            ev = _shrink(old, new, "troca_codigo")
+            ev = _shrink(old, new, "troca_codigo", prices)
             if ev:
                 events.append(ev)
     return events

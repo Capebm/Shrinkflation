@@ -10,16 +10,22 @@ from urllib.parse import urlsplit
 USER_AGENT = "RadarShrinkflationPT/0.1 (projeto sem fins lucrativos; github.com/capebm/shrinkflation)"
 
 
-def get(url: str, *, retries: int = 3, timeout: int = 30) -> str:
+BACKOFF = (5, 15, 45)  # seconds between attempts; overloaded public APIs answer 503 or 429
+
+
+def get(url: str, *, retries: int = len(BACKOFF) + 1, timeout: int = 30) -> str:
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept-Language": "pt-PT,pt;q=0.9"})
     for attempt in range(retries):
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 return resp.read().decode(resp.headers.get_content_charset() or "utf-8", "replace")
+        except urllib.error.HTTPError as exc:
+            if (exc.code < 500 and exc.code != 429) or attempt == retries - 1:
+                raise
         except (urllib.error.URLError, TimeoutError):
             if attempt == retries - 1:
                 raise
-            time.sleep(2 ** (attempt + 1))
+        time.sleep(BACKOFF[min(attempt, len(BACKOFF) - 1)])
     raise RuntimeError("unreachable")
 
 

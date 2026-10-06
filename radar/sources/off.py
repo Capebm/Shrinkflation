@@ -3,9 +3,18 @@
 No prices here; shrinks found from this source report the implied rise at an
 unchanged shelf price. API etiquette: custom User-Agent and at most ~10 search
 requests per minute.
+
+Search goes first to Search-a-licious (search.openfoodfacts.org), the newer
+Elasticsearch service, and falls back to the classic /api/v2/search, which
+answered 503 on the first GitHub Actions run. Parameters checked against the
+search-a-licious source (app/_types.py, data/config/openfoodfacts.yml): Lucene
+query in ``q``, ``page``/``page_size`` (page * page_size <= 10 000), response
+``{"hits": [...], "page_count": N}``; text fields come per language
+(``{"main": ..., "pt": ...}``).
 """
 from __future__ import annotations
 
+import sys
 import time
 from collections.abc import Callable, Iterator
 from urllib.parse import urlencode
@@ -16,6 +25,11 @@ from ..quantity import parse_quantity
 from . import http
 
 SEARCH_URL = "https://world.openfoodfacts.org/api/v2/search"
+SAL_URL = "https://search.openfoodfacts.org/search"
+SAL_FIELDS = ",".join([
+    "code", "product_name", "brands", "quantity", "product_quantity", "product_quantity_unit",
+    "ingredients_text", "nutriments",
+])
 FIELDS = ",".join([
     "code", "product_name", "product_name_pt", "brands", "quantity", "product_quantity",
     "product_quantity_unit", "ingredients_text_pt", "ingredients_text", "ingredients", "nutriments",
@@ -26,6 +40,40 @@ DEFAULT_CATEGORIES = [
     "en:chocolates", "en:coffees", "en:breakfast-cereals", "en:biscuits", "en:crisps",
     "en:yogurts", "en:frozen-foods", "en:margarines", "en:ice-creams", "en:sausages",
 ]
+
+
+def search_sal(category: str, *, max_pages: int = 10, page_size: int = 100, pause: float = 6.5,
+               get_json: Callable[[str], dict] = http.get_json) -> Iterator[dict]:
+    for page in range(1, max_pages + 1):
+        params = {"q": f'countries_tags:"en:portugal" AND categories_tags:"{category}"', "langs": "pt,en",
+                  "fields": SAL_FIELDS, "page_size": page_size, "page": page}
+        data = get_json(f"{SAL_URL}?{urlencode(params)}")
+        if "hits" not in data:
+            raise RuntimeError(f"Search-a-licious sem resultados: {str(data.get('errors'))[:200]}")
+        yield from map(_from_sal_hit, data["hits"])
+        if page >= int(data.get("page_count") or 1):
+            return
+        time.sleep(pause)
+
+
+def _lang(value) -> str:
+    if isinstance(value, dict):
+        return value.get("pt") or value.get("main") or value.get("en") or next(iter(value.values()), "") or ""
+    return value or ""
+
+
+def _from_sal_hit(hit: dict) -> dict:
+    """Reshape a Search-a-licious hit into the classic API product shape used below."""
+    brands = hit.get("brands") or ""
+    if isinstance(brands, list):
+        brands = brands[0] if brands else ""
+    brands = brands.split(":", 1)[-1] if ":" in brands[:4] else brands
+    if brands and brands == brands.lower() and " " not in brands:  # taxonomy slug, e.g. "marca-teste"
+        brands = brands.replace("-", " ").title()
+    return {"code": hit.get("code"), "product_name": _lang(hit.get("product_name")), "brands": brands,
+            "quantity": hit.get("quantity"), "product_quantity": hit.get("product_quantity"),
+            "product_quantity_unit": hit.get("product_quantity_unit"),
+            "ingredients_text": _lang(hit.get("ingredients_text")), "nutriments": hit.get("nutriments")}
 
 
 def search(category: str, *, max_pages: int = 10, page_size: int = 100, pause: float = 6.5,
@@ -63,11 +111,25 @@ def to_observation(p: dict, observed_at: str) -> Observation | None:
 
 
 def collect(categories: list[str], observed_at: str, max_pages: int = 10,
-            get_json: Callable[[str], dict] = http.get_json) -> list[Observation]:
+            get_json: Callable[[str], dict] = http.get_json, pause: float = 6.5
+            ) -> tuple[list[Observation], list[str]]:
+    """Return the observations and the categories that could not be read from either service."""
     seen: dict[str, Observation] = {}
+    failed: list[str] = []
     for category in categories:
-        for product in search(category, max_pages=max_pages, get_json=get_json):
+        products = None
+        for name, fn in (("search-a-licious", search_sal), ("api/v2/search", search)):
+            try:
+                products = list(fn(category, max_pages=max_pages, get_json=get_json, pause=pause))
+                break
+            except Exception as exc:  # one service down should not stop the weekly run
+                print(f"{category}: {name} falhou ({exc})", file=sys.stderr)
+        if products is None:
+            failed.append(category)
+            continue
+        print(f"{category}: {len(products)} produtos", file=sys.stderr)
+        for product in products:
             obs = to_observation(product, observed_at)
             if obs and obs.ean not in seen:
                 seen[obs.ean] = obs
-    return list(seen.values())
+    return list(seen.values()), failed
