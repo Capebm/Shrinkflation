@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Termómetro Partido?</title>
+<meta name="description" content="Avaliação crítica da tese da 'inflação real' em Portugal, verificada contra fontes oficiais, e proposta de um radar de shrinkflation.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+/* Layout: one reading column (~68ch) with wide breakout blocks for tables, charts and the radar pipeline. */
+:root{
+  --bg:#F3F6F7; --surface:#FFFFFF; --fg:#15202B; --muted:#56656F; --rule:#D3DCE1;
+  --accent:#0E5A6E; --hot:#B3261E; --ok:#2C7A4B; --mid:#9A6200; --na:#6B7780;
+  --hot-soft:#F7E3E1; --ok-soft:#E0F0E6; --mid-soft:#F6EBD6; --na-soft:#E6EAED; --accent-soft:#DDECF0;
+  --display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --body:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E151A; --surface:#151F26; --fg:#E3EAEE; --muted:#97A7B2; --rule:#27343D;
+  --accent:#62B6CC; --hot:#F07A70; --ok:#6CC490; --mid:#E2AB4B; --na:#9AA6AE;
+  --hot-soft:#3A1E1C; --ok-soft:#173226; --mid-soft:#352A14; --na-soft:#1F2A31; --accent-soft:#16323B;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E151A; --surface:#151F26; --fg:#E3EAEE; --muted:#97A7B2; --rule:#27343D;
+  --accent:#62B6CC; --hot:#F07A70; --ok:#6CC490; --mid:#E2AB4B; --na:#9AA6AE;
+  --hot-soft:#3A1E1C; --ok-soft:#173226; --mid-soft:#352A14; --na-soft:#1F2A31; --accent-soft:#16323B;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:1.0625rem;line-height:1.6}
+.wrap{max-width:66rem;margin:0 auto;padding-inline:clamp(16px,4vw,40px);padding-block:2.5rem 4rem}
+.col{max-width:42rem}
+h1,h2,h3{font-family:var(--display);line-height:1.1;text-wrap:balance;margin:0}
+h1{font-size:clamp(2.4rem,7vw,4.6rem);font-weight:800;font-stretch:72%;letter-spacing:-.01em}
+h2{font-size:clamp(1.6rem,3.6vw,2.3rem);font-weight:750;font-stretch:80%;margin-top:3.5rem}
+h3{font-size:1.15rem;font-weight:700;font-stretch:90%;margin-top:2rem}
+p{margin:.9rem 0}
+a{color:var(--accent);text-underline-offset:2px}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.eyebrow{font-family:var(--mono);font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{font-size:1.2rem;color:var(--fg);max-width:40rem}
+.note{font-size:.92rem;color:var(--muted)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+hr{border:0;border-top:1px solid var(--rule);margin:3rem 0}
+
+/* hero thermometer */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2rem;align-items:end;border-bottom:2px solid var(--fg);padding-bottom:1.5rem}
+.gauge{display:flex;gap:1.25rem;align-items:flex-end}
+.tube{display:flex;flex-direction:column;align-items:center;gap:.4rem}
+.tube .glass{width:22px;height:150px;border:2px solid var(--fg);border-radius:12px;position:relative;overflow:hidden;background:var(--surface)}
+.tube .fill{position:absolute;left:0;right:0;bottom:0;border-radius:0 0 10px 10px}
+.tube .v{font-family:var(--mono);font-size:1.05rem;font-weight:500}
+.tube .l{font-family:var(--mono);font-size:.7rem;color:var(--muted);text-align:center;max-width:7rem;line-height:1.3}
+@media (max-width:640px){.hero{grid-template-columns:1fr}}
+
+/* tables */
+.tbl{overflow-x:auto;margin:1.25rem 0;border:1px solid var(--rule);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.95rem}
+th,td{padding:.6rem .8rem;text-align:left;vertical-align:top;border-bottom:1px solid var(--rule)}
+th{font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:500}
+td.r,th.r{text-align:right}
+tr:last-child td{border-bottom:0}
+.flag{color:var(--hot);font-weight:600}
+
+/* verdicts */
+.claims{display:grid;gap:0;margin-top:1.25rem;border-top:1px solid var(--rule)}
+.claim{display:grid;grid-template-columns:8.5rem minmax(0,1fr);gap:1rem;padding:1.1rem 0;border-bottom:1px solid var(--rule)}
+.claim q{font-style:italic;quotes:"«" "»"}
+.claim .src{font-size:.85rem;color:var(--muted);margin-top:.35rem}
+.chip{display:inline-block;font-family:var(--mono);font-size:.72rem;font-weight:500;letter-spacing:.05em;text-transform:uppercase;padding:.25rem .5rem;border-radius:3px;align-self:start;text-align:center}
+.c-ok{background:var(--ok-soft);color:var(--ok)}
+.c-mid{background:var(--mid-soft);color:var(--mid)}
+.c-bad{background:var(--hot-soft);color:var(--hot)}
+.c-na{background:var(--na-soft);color:var(--na)}
+.tally{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem}
+@media (max-width:560px){.claim{grid-template-columns:1fr;gap:.4rem}}
+
+/* chart */
+.figure{margin:1.5rem 0;background:var(--surface);border:1px solid var(--rule);padding:1rem 1rem .75rem}
+.figure svg{display:block;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:1rem;font-family:var(--mono);font-size:.75rem;color:var(--muted);margin-bottom:.5rem}
+.legend i{display:inline-block;width:.8rem;height:.8rem;margin-right:.35rem;vertical-align:-1px}
+
+/* tools */
+.tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr));gap:1.25rem;margin:1.5rem 0}
+.tool{background:var(--surface);border:1px solid var(--rule);padding:1.1rem 1.2rem;min-width:0}
+.tool h3{margin-top:0}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin:.75rem 0}
+label{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:.25rem}
+input[type=number],select{width:100%;font:inherit;font-family:var(--mono);font-size:.95rem;padding:.45rem .5rem;border:1px solid var(--rule);background:var(--bg);color:var(--fg);border-radius:3px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.out{font-family:var(--mono);font-size:2rem;font-weight:500;margin:.25rem 0}
+.out small{font-size:.85rem;color:var(--muted);font-weight:400}
+
+/* radar pipeline */
+.pipe{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr));gap:0;margin:1.5rem 0;border:1px solid var(--rule);background:var(--surface)}
+.stage{padding:1rem;border-right:1px solid var(--rule);min-width:0}
+.stage:last-child{border-right:0}
+.stage .k{font-family:var(--mono);font-size:.72rem;color:var(--accent);letter-spacing:.06em;text-transform:uppercase}
+.stage h4{font-family:var(--display);font-stretch:85%;font-size:1.05rem;margin:.3rem 0 .4rem}
+.stage ul{margin:0;padding-left:1.1rem;font-size:.9rem}
+@media (max-width:760px){.stage{border-right:0;border-bottom:1px solid var(--rule)}.stage:last-child{border-bottom:0}}
+pre{background:var(--surface);border:1px solid var(--rule);padding:1rem;overflow-x:auto;font-family:var(--mono);font-size:.82rem;line-height:1.5}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:.8rem 1rem;margin:1.25rem 0}
+.callout.warn{border-left-color:var(--hot);background:var(--hot-soft)}
+ol.src-list{padding-left:1.3rem;font-size:.92rem}
+ol.src-list li{margin:.35rem 0}
+footer{margin-top:3rem;font-size:.85rem;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.tube .fill{transition:height .8s ease}}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<header class="hero">
+  <div>
+    <div class="eyebrow">Verificação · Bitcoin Talks, episódio sobre «inflação real» · outubro 2026</div>
+    <h1>Termómetro partido?</h1>
+    <p class="lede">O episódio diz que a inflação «real» em Portugal anda nos 9 a 10% e não nos 2,3% oficiais. Verificámos cada número contra o INE, o Eurostat, o BCE e o Banco de Portugal. A conclusão: o problema da habitação é real, mas a conta que transforma 2,3% em 9% não aguenta.</p>
+  </div>
+  <div class="gauge" aria-label="Comparação de três medidas de inflação para 2025">
+    <div class="tube"><span class="v">2,3%</span><div class="glass"><div class="fill" data-h="2.3" style="background:var(--accent)"></div></div><span class="l">IPC oficial 2025</span></div>
+    <div class="tube"><span class="v">~3,5%</span><div class="glass"><div class="fill" data-h="3.5" style="background:var(--mid)"></div></div><span class="l">Peso de 39%, com rendas</span></div>
+    <div class="tube"><span class="v">8,7%</span><div class="glass"><div class="fill" data-h="8.7" style="background:var(--hot)"></div></div><span class="l">«IPC ajustado» do episódio</span></div>
+  </div>
+</header>
+
+<section class="col">
+  <h2>A tese em três frases</h2>
+  <p>O IPC dá à habitação um peso de cerca de 9,4%, mas o Inquérito às Despesas das Famílias (IDEF) mostra que a habitação vale 39,3% da despesa. A habitação própria, onde vivem 74% dos portugueses, não entra no índice. Se trocarmos o peso por 39% e usarmos a subida do preço das casas, a inflação de 2025 passa de 2,3% para perto de 9%.</p>
+  <p>O episódio junta outros argumentos: a shrinkflation (o produto encolhe e o preço fica) não seria captada, as rendas do IPC seriam «antigas», a substituição por produtos piores baixaria o índice e quem ganha com isto seriam o Estado e o BCE. Termina com a venda de uma mentoria de investimento e com um segmento patrocinado de uma corretora de cripto.</p>
+</section>
+
+<section>
+  <h2 class="col">A tabela do episódio, refeita</h2>
+  <p class="col">Esta é a tabela que aparece no vídeo («Impacto por ano recente»). Acrescentámos duas colunas. A primeira é o peso da habitação que seria preciso usar para chegar ao «IPC ajustado», partindo da fórmula descrita no episódio: (1 − p) × IPC + p × IPHab. A segunda é o valor que essa fórmula dá com o peso de 39,3% que o próprio episódio diz usar.</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Ano</th><th class="r">IPHab (INE)</th><th class="r">IPC oficial no vídeo</th><th class="r">IPC oficial (INE)</th><th class="r">«IPC ajustado» no vídeo</th><th class="r">Peso implícito</th><th class="r">Fórmula com p = 39,3%</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div class="col">
+    <p class="note">IPHab: Índice de Preços da Habitação do INE, variação média anual dos preços de casas transacionadas. Os valores de 2021–2025 conferem com o INE.</p>
+    <div class="callout warn">
+      <p style="margin:0"><strong>Três problemas só nesta tabela.</strong> (1) Em 2023 o vídeo usa 5,3%, que é o IHPC (o índice harmonizado europeu). O IPC desse ano foi 4,3%; os outros anos são todos IPC. (2) O peso que reproduz cada linha varia entre 33% e 43%, por isso a tabela não sai de uma única regra. (3) No áudio fala-se em «cerca de 6%» para 2024 e «9 a 10%» para 2025; a própria tabela mostra 5,0% e 8,7%.</p>
+    </div>
+  </div>
+  <div class="figure">
+    <div class="legend"><span><i style="background:var(--accent)"></i>IPC oficial (INE)</span><span><i style="background:var(--hot)"></i>«IPC ajustado» do episódio</span><span><i style="background:var(--na)"></i>Preço das casas (IPHab)</span></div>
+    <svg id="chart" viewBox="0 0 720 300" role="img" aria-label="Barras por ano, 2021 a 2025, com o IPC oficial, o IPC ajustado do episódio e a variação do preço das casas"></svg>
+  </div>
+</section>
+
+<section class="col">
+  <h2>Onde a conta falha</h2>
+  <h3>1. O preço de uma casa é o preço de um ativo e não um custo de consumo</h3>
+  <p>O IPC mede quanto custa, de um ano para o outro, o mesmo cabaz de consumo. Quem comprou casa em 2010 e vive nela não paga, em 2025, mais 17,6% por morar lá. Paga a mesma prestação (mais os juros variáveis, que voltamos a ver abaixo). Para esse proprietário, a subida do preço é um aumento de património. Aplicar o IPHab a 39% do orçamento de toda a gente trata 74% de proprietários como se comprassem a casa outra vez todos os anos.</p>
+  <p>O preço das casas pesa de facto sobre quem compra agora, sobretudo os jovens, e sobre quem arrenda. Isso é um problema de acesso e de distribuição. Não é um erro do termómetro da inflação média.</p>
+
+  <h3>2. Os 39,3% do IDEF incluem uma renda que ninguém paga</h3>
+  <p>O IDEF 2022/2023 do INE atribui 39,3% da despesa à classe «habitação, água, eletricidade, gás e outros combustíveis». Esse número inclui as <em>rendas imputadas</em>: o INE estima quanto pagaria de renda um proprietário que vive na sua casa e soma esse valor à despesa. É uma convenção estatística útil e não um pagamento. O IPC segue o conceito de despesa monetária, e por isso o peso da classe 04 foi de 101,8‰ em 2025 e 93,6‰ em 2026 (os tais 9,4%). A diferença entre os dois números é sobretudo esta renda fictícia.</p>
+  <p>A água, a luz, o gás e as rendas efetivas já estão dentro do IPC. Ao subir o peso da habitação para 39% e aplicar-lhe a variação do preço das casas, a conta do episódio substitui também a eletricidade e as rendas reais pelo IPHab.</p>
+
+  <h3>3. Mesmo com pressupostos generosos o número fica longe de 9%</h3>
+  <p>Mantendo o peso de 39,3% mas medindo o custo de habitar pelas rendas (o método da «renda equivalente», usado por exemplo nos EUA), o resultado é cerca de 4,2% em 2024 e 3,5% em 2025. Para a área do euro, o BCE estimou que incluir a habitação própria teria alterado a inflação anual entre −1,2 e +0,4 pontos percentuais desde 2011, conforme o método. Pode testar os pressupostos na calculadora abaixo.</p>
+
+  <h3>4. Os outros indicadores não batem certo com 9%</h3>
+  <p>Se o custo de vida tivesse subido 9% em 2025, os salários teriam caído em termos reais. O INE mediu uma subida nominal de 5,6% na remuneração bruta média em 2025, ou +3,2% acima do IPC. «Ficar 10% mais pobre todos os anos», como diz o episódio, significaria perder cerca de 40% do poder de compra em cinco anos. Não há nenhuma série de consumo, de vendas a retalho ou de salários que mostre isso.</p>
+</section>
+
+<section class="tools">
+  <div class="tool">
+    <h3>Refaça a conta</h3>
+    <p class="note" style="margin-top:.25rem">Alternativa = (1 − p) × IPC + p × medida da habitação. É a fórmula do episódio, simplificada: o IPC já contém parte da habitação.</p>
+    <div class="row">
+      <div><label for="yr">Ano</label><select id="yr"><option value="2025">2025</option><option value="2024">2024</option></select></div>
+      <div><label for="measure">Custo da habitação</label><select id="measure"><option value="hpi">Preço das casas (IPHab)</option><option value="rent">Rendas</option></select></div>
+    </div>
+    <label for="w">Peso da habitação: <span id="wv" class="num">39,3%</span></label>
+    <input id="w" type="range" min="0" max="45" step="0.1" value="39.3">
+    <div class="out" id="res">–</div>
+    <p class="note" id="resnote"></p>
+  </div>
+  <div class="tool">
+    <h3>Calculadora de shrinkflation</h3>
+    <p class="note" style="margin-top:.25rem">Quanto subiu de facto o preço por unidade quando a embalagem encolhe.</p>
+    <div class="row">
+      <div><label for="q0">Quantidade antes (g, ml, un.)</label><input id="q0" type="number" min="0" step="any" value="500"></div>
+      <div><label for="p0">Preço antes (€)</label><input id="p0" type="number" min="0" step="0.01" value="2.49"></div>
+      <div><label for="q1">Quantidade depois</label><input id="q1" type="number" min="0" step="any" value="450"></div>
+      <div><label for="p1">Preço depois (€)</label><input id="p1" type="number" min="0" step="0.01" value="2.49"></div>
+    </div>
+    <div class="out" id="shr">–</div>
+    <p class="note" id="shrnote"></p>
+  </div>
+</section>
+
+<section>
+  <h2 class="col">Alegação a alegação</h2>
+  <div class="col tally" id="tally"></div>
+  <div class="claims col" id="claims"></div>
+</section>
+
+<section class="col">
+  <h2>O que o episódio acerta e devia ter dito melhor</h2>
+  <p><strong>A habitação própria está mesmo fora do IHPC.</strong> Não é um segredo. O BCE reconheceu-o na revisão da estratégia de 2021, decidiu que a inclusão «representaria melhor a inflação relevante para as famílias» e o Eurostat já publica um índice trimestral de habitação própria (OOH), que o BCE acompanha. A integração no índice mensal continua por concretizar.</p>
+  <p><strong>Os juros do crédito à habitação também ficaram de fora.</strong> Este seria o argumento mais forte e o episódio não o usa. Em Portugal a maioria dos créditos tem taxa variável, e a subida da Euribor em 2022–2023 aumentou muito as prestações. O IPC não regista juros, por desenho, porque são um custo financeiro. Para as famílias endividadas, a pressão foi real e o índice não a mostra.</p>
+  <p><strong>Cada família tem a sua inflação.</strong> O IPC é uma média ponderada pela despesa. O Banco de Portugal mostrou em 2022 que as famílias de menores rendimentos, com mais peso de alimentação e habitação no orçamento, perderam poder de compra enquanto a média ganhava.</p>
+  <p><strong>A inflação sentida é maior do que a medida.</strong> No inquérito do BCE às expectativas dos consumidores, a mediana da inflação percebida nos 12 meses anteriores andou entre 3,0% e 4,0% em 2026. Os preços de compra frequente (supermercado, combustível) marcam a memória muito mais do que o seu peso no cabaz. O próprio BCE mostra que a perceção da inflação alimentar pesa mais nas expectativas do que os 21% que a alimentação vale no índice.</p>
+  <div class="callout">
+    <p style="margin:0"><strong>Conflito de interesses.</strong> O número de «9 a 10%» serve de ponte para a parte comercial do episódio: a abertura de turma de uma mentoria paga, com desconto de 160 €, e um segmento patrocinado pela Bybit, com link de referência, cartão com cashback e uma remuneração de 3% sobre saldos. Uma remuneração numa corretora de cripto não é um depósito bancário e não está coberta pelo Fundo de Garantia de Depósitos. Isto não torna os números falsos por si só, mas é uma razão para os verificar.</p>
+  </div>
+</section>
+
+<hr>
+
+<section>
+  <div class="col">
+    <div class="eyebrow">Parte 2</div>
+    <h2 style="margin-top:.4rem">Radar de shrinkflation e skimpflation</h2>
+    <p class="lede">O episódio enganou-se ao dizer que o IPC não vê a shrinkflation. Os institutos de estatística ajustam a quantidade e registam a subida de preço por unidade. O que falta é transparência ao nível do produto: quem encolheu o quê, quando e quanto. É aí que um radar público acrescenta valor.</p>
+    <p>Também falta medir a <em>skimpflation</em>, ou seja, a perda de qualidade: menos carne no hambúrguer, mais água no creme vegetal, folhas mais finas no papel higiénico. Os índices oficiais têm mais dificuldade aqui, e a lei europeia de rotulagem dá-nos um sinal que quase ninguém explora.</p>
+  </div>
+
+  <h3 class="col">Como funciona</h3>
+  <div class="pipe">
+    <div class="stage"><div class="k">1 · Recolher</div><h4>Fotografias semanais</h4><ul><li>Lojas online PT: preço, quantidade líquida, preço por kg/l, EAN, nome, imagem</li><li>Open Food Facts: ingredientes, tabela nutricional, histórico de revisões</li><li>Contributos: leitura do código de barras e foto do rótulo</li></ul></div>
+    <div class="stage"><div class="k">2 · Ligar</div><h4>Identidade do produto</h4><ul><li>Mesmo EAN ao longo do tempo</li><li>EAN novo que substitui um antigo: mesma marca, nome parecido, imagem parecida, antigo desaparece</li></ul></div>
+    <div class="stage"><div class="k">3 · Comparar</div><h4>Motor de diferenças</h4><ul><li>Quantidade ↓ com preço ≥</li><li>% do ingrediente principal (QUID) ↓</li><li>Ordem dos ingredientes, gordura, proteína</li><li>Unidades por pacote, folhas, dimensões</li></ul></div>
+    <div class="stage"><div class="k">4 · Classificar</div><h4>Gravidade</h4><ul><li>Aumento efetivo por unidade (%)</li><li>Tipo: shrink, skimp, embalagem</li><li>Confiança: automático, confirmado por pessoa</li></ul></div>
+    <div class="stage"><div class="k">5 · Publicar</div><h4>Radar público</h4><ul><li>Feed de alertas por categoria e marca</li><li>Índice «preço de prateleira» vs. «preço por unidade»</li><li>Dossiês para a DECO e a Direção-Geral do Consumidor</li></ul></div>
+  </div>
+
+  <div class="col">
+    <h3>Os sinais a detetar</h3>
+  </div>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Sinal</th><th>Regra de deteção</th><th>Fonte dos dados</th><th>Exemplo</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Shrinkflation</strong></td><td>Quantidade líquida desce e o preço de prateleira fica igual ou sobe; o alerta dispara quando o preço por unidade sobe mais de 3%</td><td>Lojas online, preço por unidade de medida (obrigatório na UE)</td><td>DECO, 2022: creme vegetal com menos 50 g ao mesmo preço, até +31% por kg</td></tr>
+        <tr><td><strong>Skimpflation (receita)</strong></td><td>A % do ingrediente que dá nome ao produto desce, ou um ingrediente caro desce na lista</td><td>QUID: o Regulamento (UE) 1169/2011 obriga a indicar a % do ingrediente destacado no nome</td><td>Hambúrguer «de novilho» de 95% para 80% de carne</td></tr>
+        <tr><td><strong>Skimpflation (nutrição)</strong></td><td>Proteína ou gordura descem e a água sobe acima do ruído normal de reformulação</td><td>Tabela nutricional (Open Food Facts, rótulos)</td><td>Creme vegetal com menos óleo e mais água</td></tr>
+        <tr><td><strong>Embalagem</strong></td><td>Dimensões iguais com menos conteúdo; menos unidades, folhas ou doses por pacote</td><td>Fotos de contribuidores, descrição do produto</td><td>Rolos com menos folhas ao mesmo preço</td></tr>
+        <tr><td><strong>Troca de código</strong></td><td>Um EAN desaparece e entra outro da mesma marca com quantidade menor</td><td>Histórico do catálogo</td><td>O caso mais comum e o mais difícil de apanhar à mão</td></tr>
+        <tr><td><strong>Falsa promoção</strong></td><td>«Novo formato» ou «agora mais prático» coincide com a subida do preço por unidade</td><td>Texto da embalagem, OCR</td><td>Mensagem de marketing que esconde o aumento</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <h3>Modelo de dados mínimo</h3>
+  </div>
+<pre>product(id, brand, name, category, first_seen, last_seen)
+barcode(ean, product_id, valid_from, valid_to)            -- vários EAN por produto ao longo do tempo
+observation(id, ean, retailer, observed_at, shelf_price, net_qty, unit, unit_price, promo_flag, url)
+composition(ean, captured_at, quid_pct, ingredients_text, energy, fat, protein, sugar, salt, source)
+packaging(ean, captured_at, units_per_pack, sheets, dims_mm, photo_ref)
+event(id, product_id, type{shrink|skimp|pack|ean_swap}, before, after, unit_price_change_pct,
+      detected_at, confidence{auto|reviewed}, evidence_refs)</pre>
+
+  <div class="col">
+    <h3>Plano para um primeiro protótipo (6–8 semanas)</h3>
+    <ol>
+      <li><strong>Âmbito.</strong> Cerca de 1 500 produtos de marca nas categorias com mais casos documentados: chocolate, café, cereais, bolachas, snacks, papel higiénico, detergentes, iogurtes e congelados.</li>
+      <li><strong>Base histórica.</strong> Carregar o dump do Open Food Facts filtrado para Portugal. As revisões de quantidade e ingredientes permitem encontrar casos passados logo no primeiro dia.</li>
+      <li><strong>Recolha semanal.</strong> Script agendado (Python e Playwright, numa GitHub Action) que lê a página de produto em uma ou duas lojas online e guarda observações em Postgres. Respeitar robots.txt e os termos de utilização, com ritmo baixo. Uma parceria com retalhistas ou com a DECO é a via mais segura.</li>
+      <li><strong>Motor de diferenças.</strong> As regras da tabela acima e uma ligação entre EAN antigos e novos por marca, nome e semelhança de imagem. Os casos duvidosos vão para revisão manual.</li>
+      <li><strong>Site público.</strong> Feed de alertas, ficha por produto com o histórico, ranking de marcas e um índice que compara o preço de prateleira com o preço por unidade para medir quanto a shrinkflation pesa de facto.</li>
+      <li><strong>Contributos.</strong> Página móvel para ler o código de barras e fotografar o rótulo. Cada contributo fica com o estado «não confirmado» até haver duas fontes.</li>
+    </ol>
+
+    <h3>Contexto legal</h3>
+    <p>A shrinkflation é legal na UE desde que a quantidade esteja bem rotulada. Vários países já exigem aviso ao consumidor: França desde 1 de julho de 2024 (lojas com mais de 400 m², durante dois meses, com multas até 15 000 €), Hungria desde 2024, Coreia do Sul desde agosto de 2024, Itália e Áustria com regras próprias. No Brasil, a Portaria 392/2021 obriga a destacar a alteração na frente da embalagem durante seis meses. Em Portugal, a DECO propôs legislação, mas não encontrámos nenhuma lei aprovada. Um radar com dados verificáveis serve precisamente para alimentar esse debate.</p>
+
+    <div class="callout">
+      <p style="margin:0"><strong>Cuidados.</strong> Publicar só casos com prova: duas observações datadas, com fonte, ou foto do rótulo antes e depois. Distinguir um aumento normal de preço de uma redução escondida. Dar às marcas direito de resposta. Não acusar de fraude: o enquadramento certo é a falta de transparência.</p>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<section class="col">
+  <h2 style="margin-top:0">Fontes</h2>
+  <p class="note">O acesso direto a ine.pt, ec.europa.eu e youtube.com estava bloqueado no ambiente onde esta página foi feita. Os números foram verificados através de pesquisa web nas publicações do INE, do BCE e do Eurostat, e da imprensa que as cita. A transcrição e a tabela do episódio foram enviadas pelo utilizador. Antes de citar um valor, confirme-o na fonte primária.</p>
+  <h3>Oficiais</h3>
+  <ol class="src-list">
+    <li>INE: IPC 2025, média anual 2,3% e ponderadores. <a href="https://www.ine.pt/ngt_server/attachfileu.jsp?look_parentBoui=771617594&amp;att_display=n&amp;att_download=y">Destaque IPC dez. 2025</a></li>
+    <li>INE: estimativa rápida do IPC de setembro de 2026 (3,6%). <a href="https://www.ine.pt/xportal/xmain?xpid=INE&amp;xpgid=ine_destaques&amp;DESTAQUESdest_boui=224677917&amp;DESTAQUESmodo=2&amp;xlang=pt">Portal INE, destaques</a></li>
+    <li>INE: Inquérito às Despesas das Famílias 2022/2023, habitação 39,3%. <a href="https://www.ine.pt/ngt_server/attachfileu.jsp?look_parentBoui=673105441&amp;att_display=n&amp;att_download=y">Publicação IDEF</a> · <a href="https://www.ine.pt/xportal/xmain?xpid=INE&amp;xpgid=ine_destaques&amp;DESTAQUESdest_boui=646072579&amp;DESTAQUESmodo=2&amp;xlang=pt">Destaque</a></li>
+    <li>INE: estrutura de ponderação do IPC (conceito de despesa monetária). <a href="https://www.ine.pt/xportal/xmain?xpid=INE&amp;xpgid=ine_faqs&amp;FAQSfaq_boui=605140741&amp;FAQSmodo=1&amp;xlang=pt">FAQ do INE</a></li>
+    <li>INE: estatísticas de preços da habitação ao nível local, 4.º trimestre de 2025. <a href="https://www.ine.pt/ngt_server/attachfileu.jsp?look_parentBoui=789055201&amp;att_display=n&amp;att_download=y">Publicação</a></li>
+    <li>BCE: inquérito às expectativas dos consumidores, inflação percebida em 2026. <a href="https://www.ecb.europa.eu/press/pr/date/2026/html/ecb.pr260821~a044fdddd9.en.html">Comunicado de agosto de 2026</a></li>
+    <li>BCE: alimentos, género e expectativas de inflação. <a href="https://www.ecb.europa.eu/press/blog/date/2022/html/ecb.blog220914~3b10d6ddb8.en.html">Blog do BCE, 2022</a></li>
+    <li>BCE e DNB: inclusão da habitação própria após a revisão da estratégia de 2021. <a href="https://www.dnb.nl/en/general-news/2021/home-ownership-costs-to-be-incorporated-in-the-inflation-measure/">DNB</a> · <a href="https://www.suerf.org/policynotes/11021/euro-area-economics-putting-the-ooh-into-hicp">SUERF Policy Note</a></li>
+    <li>Banco de Portugal: impacto desigual da inflação por rendimento. <a href="https://www.bportugal.pt/sites/default/files/anexos/documentos-relacionados/intervpub20221221.pdf">Intervenção, dez. 2022</a></li>
+    <li>Eurostat: manual metodológico do IHPC, edição de 2024. <a href="https://ec.europa.eu/eurostat/web/products-manuals-and-guidelines/w/ks-gq-24-003">Manual</a> · Regulamento de Execução (UE) 2020/1148 sobre ajustamento de qualidade. <a href="https://eur-lex.europa.eu/eli/reg_impl/2020/1148/oj">EUR-Lex</a></li>
+    <li>Atualização das pensões pelo IPC sem habitação e pelo PIB (Lei 53-B/2006). <a href="https://www.montepio.org/ei/mais-recentes/aumentos-das-pensoes/">Resumo Montepio</a></li>
+    <li>ONS (Reino Unido): impacto da shrinkflation no índice de preços. <a href="https://www.ons.gov.uk/economy/inflationandpriceindices/articles/theimpactofshrinkflationoncpihuk/howmanyofourproductsaregettingsmaller">ONS</a></li>
+    <li>GAO e BLS (EUA): a variação de tamanho somou cerca de 0,01 p.p. por ano ao IPC. <a href="https://www.gao.gov/assets/gao-25-107451.pdf">GAO-25-107451</a></li>
+    <li>Governo francês: obrigações sobre a «réduflation» desde 1 de julho de 2024. <a href="https://www.economie.gouv.fr/actualites/reduflation-de-nouvelles-obligations-des-le-1er-juillet-pour-informer-les-consommateurs">economie.gouv.fr</a></li>
+    <li>Brasil: Portaria MJSP 392/2021. <a href="https://www.legisweb.com.br/legislacao/?id=420975">Texto</a></li>
+  </ol>
+  <h3>Não oficiais e imprensa</h3>
+  <ol class="src-list">
+    <li>Eurostat via Idealista: 74% vivem em casa própria (2024). <a href="https://www.idealista.pt/news/node/72813">Idealista</a></li>
+    <li>IPHab: +9,1% em 2024 e +17,6% em 2025. <a href="https://www.noticiasaominuto.com/economia/2751704/precos-das-casas-sobem-9-1-em-2024-e-numero-de-transacoes-dispara-14-5">2024</a> · <a href="https://www.noticiasaominuto.com/economia/2960456/precos-da-habitacao-com-aumento-recorde-de-17-6-em-2025">2025</a> · IPHab 2021–2023: <a href="https://observador.pt/2022/03/23/precos-na-habitacao-aumentaram-94-em-2021-e-aceleraram-no-ultimo-trimestre/">2021</a>, <a href="https://www.idealista.pt/news/node/58015">2022</a>, <a href="https://www.theportugalnews.com/news/2024-03-22/housing-prices-rise-82/87163">2023</a></li>
+    <li>IPC de 4,3% e IHPC de 5,3% em 2023. <a href="https://rr.pt/noticia/economia/2024/01/11/taxa-de-inflacao-recua-para-43-em-2023/362273/">Renascença</a></li>
+    <li>Novos contratos de arrendamento em 2024: +10,5% no país e +4,9% em Lisboa. <a href="https://hrportugal.sapo.pt/?p=409230">HR Portugal, com dados do INE</a></li>
+    <li>Rendas: média anual de +5,3% em 2025. <a href="https://www.idealista.pt/news/taxonomy/term/23396">Idealista, com dados do INE</a></li>
+    <li>Salários reais +3,2% em 2025. <a href="https://portugal.gov.pt/gc25/comunicacao/noticias/salarios-reais-cresceram-32-em-2025">Governo</a> · <a href="https://eco.sapo.pt/2026/02/13/salario-medio-em-portugal-sobe-para-1-694-euros-brutos-por-mes/">ECO</a></li>
+    <li>Ponderador da classe 04: 101,8‰ em 2025 e 93,6‰ em 2026. <a href="https://www.jn.pt/economia/artigo/restaurantes-transportes-e-lazer-passam-a-pesar-mais-no-cabaz-da-inflacao/18050953">JN</a></li>
+    <li>DECO PROteste: casos de reduflação. <a href="https://www.deco.proteste.pt/familia-consumo/supermercado/noticias/reduflacao-produtos-mais-caros-menos-quantidade">DECO</a> · <a href="https://deco.pt/bfd_download/proposta-legislativa-reduflacao">Proposta legislativa</a></li>
+    <li>Verbraucherzentrale Hamburg: 77 produtos novos na lista em 2025, com aumento médio de 28,4%. <a href="https://www.vzhh.de/presse/nur-noch-wenige-tage-endspurt-bei-wahl-der-mogelpackung-des-jahres-2025">vzhh.de</a></li>
+    <li>Críticas metodológicas ao ShadowStats. <a href="https://www.fullstackeconomics.com/p/no-the-real-inflation-rate-isnt-14-percent">Full Stack Economics</a> · <a href="https://econbrowser.com/?p=9388">Econbrowser</a></li>
+    <li>Billion Prices Project (Cavallo e Rigobon). <a href="https://en.wikipedia.org/wiki/MIT_Billion_Prices_project">Resumo</a> · Comissão Boskin (1996). <a href="https://www.ssa.gov/history/reports/boskinrpt.html">Relatório</a></li>
+    <li>Coreia do Sul e Hungria: regras sobre shrinkflation. <a href="https://sagentia.com/blog/france-hungary-romania-and-south-korea-tackle-shrinkflation/">Sagentia</a></li>
+    <li>Open Food Facts: API e licença ODbL. <a href="https://openproductsfacts.org/data">Dados</a></li>
+  </ol>
+</section>
+
+<footer class="col">Análise independente feita a partir da transcrição do episódio. Não é aconselhamento financeiro. Outubro de 2026.</footer>
+</main>
+
+<script>
+(function(){
+  var fmt=function(x,d){return x.toFixed(d===undefined?1:d).replace('.',',')};
+  // Thermometer fills, scale 0–10%
+  document.querySelectorAll('.tube .fill').forEach(function(el){
+    var v=parseFloat(el.getAttribute('data-h'));el.style.height=Math.min(100,v*10)+'%';
+  });
+
+  // Episode table vs INE
+  var rows=[
+    {y:2021,hpi:9.4,vid:1.3,ine:1.3,adj:4.8},
+    {y:2022,hpi:12.6,vid:7.8,ine:7.8,adj:9.4},
+    {y:2023,hpi:8.2,vid:5.3,ine:4.3,adj:6.4},
+    {y:2024,hpi:9.1,vid:2.4,ine:2.4,adj:5.0},
+    {y:2025,hpi:17.6,vid:2.3,ine:2.3,adj:8.7}
+  ];
+  var W=0.393, tb=document.getElementById('tbody');
+  rows.forEach(function(r){
+    var implied=(r.adj-r.vid)/(r.hpi-r.vid)*100;
+    var f=(1-W)*r.ine+W*r.hpi;
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td class="num">'+r.y+'</td><td class="r num">'+fmt(r.hpi)+'%</td>'+
+      '<td class="r num'+(r.vid!==r.ine?' flag':'')+'">'+fmt(r.vid)+'%'+(r.vid!==r.ine?' (IHPC)':'')+'</td>'+
+      '<td class="r num">'+fmt(r.ine)+'%</td><td class="r num">'+fmt(r.adj)+'%</td>'+
+      '<td class="r num">'+fmt(implied,0)+'%</td><td class="r num">'+fmt(f)+'%</td>';
+    tb.appendChild(tr);
+  });
+
+  // Grouped bar chart, to scale (0–20%)
+  var svg=document.getElementById('chart'),NS='http://www.w3.org/2000/svg';
+  var L=44,R=12,T=14,B=34,Wd=720,H=300,max=20,ph=H-T-B;
+  function el(n,a,t){var e=document.createElementNS(NS,n);for(var k in a)e.setAttribute(k,a[k]);if(t!==undefined)e.textContent=t;svg.appendChild(e);return e}
+  for(var g=0;g<=max;g+=5){
+    var y=T+ph-(g/max)*ph;
+    el('line',{x1:L,x2:Wd-R,y1:y,y2:y,stroke:'var(--rule)','stroke-width':1});
+    el('text',{x:L-8,y:y+4,'text-anchor':'end','font-size':11,fill:'var(--muted)','font-family':'IBM Plex Mono, monospace'},g+'%');
+  }
+  var gw=(Wd-L-R)/rows.length,bw=Math.min(30,gw/4.2);
+  var series=[['ine','var(--accent)'],['adj','var(--hot)'],['hpi','var(--na)']];
+  rows.forEach(function(r,i){
+    var cx=L+gw*i+gw/2;
+    series.forEach(function(s,j){
+      var v=r[s[0]],h=(v/max)*ph,x=cx+(j-1.5)*bw+ (j*2)-2;
+      el('rect',{x:x,y:T+ph-h,width:bw,height:h,fill:s[1]});
+      el('text',{x:x+bw/2,y:T+ph-h-4,'text-anchor':'middle','font-size':10,fill:'var(--fg)','font-family':'IBM Plex Mono, monospace'},fmt(v));
+    });
+    el('text',{x:cx,y:H-12,'text-anchor':'middle','font-size':12,fill:'var(--fg)','font-family':'IBM Plex Mono, monospace'},r.y);
+  });
+  el('line',{x1:L,x2:Wd-R,y1:T+ph,y2:T+ph,stroke:'var(--fg)','stroke-width':1});
+
+  // Sensitivity tool
+  var data={2024:{ipc:2.4,hpi:9.1,rent:7.0},2025:{ipc:2.3,hpi:17.6,rent:5.3}};
+  var yr=document.getElementById('yr'),ms=document.getElementById('measure'),w=document.getElementById('w');
+  function upd(){
+    var d=data[yr.value],p=parseFloat(w.value)/100,m=ms.value==='hpi'?d.hpi:d.rent;
+    var v=(1-p)*d.ipc+p*m;
+    document.getElementById('wv').textContent=fmt(p*100)+'%';
+    document.getElementById('res').innerHTML=fmt(v)+'% <small>vs. '+fmt(d.ipc)+'% oficial</small>';
+    document.getElementById('resnote').textContent=(ms.value==='hpi'?'IPHab ':'Rendas ')+yr.value+': '+fmt(m)+'%. '+
+      (ms.value==='hpi'?'Aplicar o preço de compra a todos os proprietários trata a casa como se fosse comprada de novo todos os anos.':
+      (yr.value==='2024'?'Rendas de 2024: cerca de 7%, o valor citado no episódio e compatível com os dados regionais do INE.':'Rendas de 2025: média anual de 5,3% (INE).'));
+  }
+  [yr,ms,w].forEach(function(e){e.addEventListener('input',upd)});upd();
+
+  // Shrinkflation calculator
+  var ids=['q0','p0','q1','p1'];
+  function shr(){
+    var v=ids.map(function(i){return parseFloat(document.getElementById(i).value)});
+    var o=document.getElementById('shr'),n=document.getElementById('shrnote');
+    if(v.some(function(x){return !(x>0)})){o.textContent='–';n.textContent='Preencha os quatro campos com valores acima de zero.';return}
+    var u0=v[1]/v[0],u1=v[3]/v[2],c=(u1/u0-1)*100;
+    o.innerHTML=(c>=0?'+':'')+fmt(c)+'% <small>no preço por unidade</small>';
+    var shelf=(v[3]/v[1]-1)*100;
+    n.textContent='O preço de prateleira variou '+(shelf>=0?'+':'')+fmt(shelf)+'%. O IPC regista a variação por unidade, porque o INE ajusta a quantidade.';
+  }
+  ids.forEach(function(i){document.getElementById(i).addEventListener('input',shr)});shr();
+
+  // Claims
+  var V={ok:['Verdadeiro','c-ok'],mid:['Em parte','c-mid'],bad:['Falso ou enganador','c-bad'],na:['Não verificado','c-na']};
+  var claims=[
+    ['ok','A inflação oficial foi de 2,4% em 2024 e 2,3% em 2025.','Confere com as médias anuais do IPC publicadas pelo INE.'],
+    ['ok','74% dos portugueses vivem em casa própria.','Eurostat, 2024: 74% das pessoas (e não das famílias), contra 68% na UE.'],
+    ['ok','A habitação própria não entra no IPC.','Os custos de ser proprietário (compra, juros, renda imputada) estão excluídos do IPC e do IHPC. A manutenção, as reparações, a água e a energia estão incluídas.'],
+    ['bad','A exclusão é deliberada e nunca foi explicada ao público.','Está documentada pelo Eurostat. O BCE decidiu em 2021 avançar com a inclusão e o Eurostat publica um índice trimestral de habitação própria.'],
+    ['ok','O peso da habitação no IPC é de cerca de 9,4%.','Classe 04 (habitação, água, eletricidade, gás): 93,6‰ em 2026 e 101,8‰ em 2025.'],
+    ['mid','O peso «real» da habitação é 39,3% (IDEF).','O número está correto, mas inclui as rendas imputadas aos proprietários, um valor estimado que ninguém paga. Por isso não se pode trocar diretamente pelo ponderador do IPC.'],
+    ['ok','O preço das casas subiu 9,1% em 2024 e 17,6% em 2025.','IPHab do INE. 2025 é o máximo da série.'],
+    ['bad','A inflação real foi de cerca de 6% em 2024 e de 9 a 10% em 2025.','A tabela do próprio episódio mostra 5,0% e 8,7%. O método aplica o preço de um ativo a todos os proprietários e conta duas vezes energia e rendas. Com rendas, o resultado é cerca de 4,2% e 3,5%. Os salários reais subiram 3,2% em 2025.'],
+    ['bad','A tabela de 2021–2025 sai de dados oficiais com um só pressuposto.','Em 2023 usa o IHPC (5,3%) em vez do IPC (4,3%). O peso implícito varia entre 33% e 43% conforme o ano.'],
+    ['mid','As rendas do IPC são «antigas».','O índice mede o que os inquilinos pagam de facto, incluindo os contratos antigos. É o correto para um índice de consumo. O INE publica à parte as rendas dos novos contratos.'],
+    ['na','As rendas do IPC subiram 7% em 2024.','Plausível: os dados regionais do INE indicam 6,7% a 7,7%. Não confirmámos o valor nacional.'],
+    ['bad','As rendas dos novos contratos em Lisboa subiram 20 a 30%.','Segundo o INE, a mediana dos novos contratos em Lisboa subiu 4,9% em 2024 e 10,5% no país. Pode haver bairros com subidas maiores.'],
+    ['bad','A shrinkflation regista inflação zero no IPC.','O IHPC obriga a ajustar a quantidade: menos gramas ao mesmo preço contam como subida de preço. O BLS e o ONS fazem o mesmo. O GAO estimou o efeito em cerca de 0,01 p.p. por ano nos EUA.'],
+    ['ok','De 500 g para 450 g ao mesmo preço é uma subida de 11%.','500 ÷ 450 − 1 = 11,1%.'],
+    ['bad','Trocar o hambúrguer de 95% de carne pelo de 50% regista deflação no IPC.','O INE acompanha o mesmo produto, com a mesma especificação, ao longo do tempo. Mudar de produto não é uma descida de preço no índice. Os pesos só mudam na revisão anual.'],
+    ['mid','Os produtos novos entram tarde no cabaz.','É verdade, mas este atraso faz o IPC sobrestimar a inflação (Comissão Boskin), e não subestimar.'],
+    ['ok','O IPC não mostra a desigualdade.','É uma média. O Banco de Portugal mostrou que as famílias de menor rendimento perderam mais poder de compra em 2022.'],
+    ['bad','O Estado ganha porque as pensões estão indexadas ao IPC.','Por lei, as pensões usam o IPC sem habitação e o crescimento do PIB. Incluir a habitação própria não mudaria esta fórmula. O INE é independente ao abrigo do Regulamento (CE) 223/2009 e é auditado pelo Eurostat.'],
+    ['bad','O BCE ganha porque o índice o faz parecer bem-sucedido.','O próprio BCE pediu que a habitação própria fosse incluída. O impacto estimado vai de −1,2 a +0,4 p.p.'],
+    ['bad','O IPC subestima a inflação de forma sistemática.','Não há evidência. Recolhas independentes de preços, como o Billion Prices Project, acompanham o IPC oficial nos países com estatística independente. Só detetaram desvios onde houve manipulação (Argentina, 2007–2016).'],
+    ['na','O INE recolhe preços de cerca de 1 300 produtos em 12 500 estabelecimentos.','Não encontrámos estes números na metodologia publicada que conseguimos consultar.']
+  ];
+  var box=document.getElementById('claims'),cnt={ok:0,mid:0,bad:0,na:0};
+  claims.forEach(function(c){cnt[c[0]]++;
+    var d=document.createElement('div');d.className='claim';
+    d.innerHTML='<span class="chip '+V[c[0]][1]+'">'+V[c[0]][0]+'</span><div><q>'+c[1]+'</q><div class="src">'+c[2]+'</div></div>';
+    box.appendChild(d)});
+  var t=document.getElementById('tally');
+  Object.keys(V).forEach(function(k){var s=document.createElement('span');s.className='chip '+V[k][1];s.textContent=cnt[k]+' · '+V[k][0];t.appendChild(s)});
+})();
+</script>
+</body>
+</html>
