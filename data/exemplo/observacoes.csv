@@ -1,0 +1,15 @@
+data,retalhista,ean,marca,nome,quantidade,preco,url,ingredientes,proteina
+2026-03-02,Loja A,5600000000017,Marca Exemplo,Tablete de chocolate de leite,100 g,1.49,,"açúcar, manteiga de cacau, leite em pó (22%), pasta de cacau",
+2026-06-01,Loja A,5600000000017,Marca Exemplo,Tablete de chocolate de leite,90 g,1.49,,"açúcar, manteiga de cacau, leite em pó (22%), pasta de cacau",
+2026-03-02,Loja A,5600000000024,Marca Exemplo,Hambúrguer de novilho 4 un,4 x 100 g,3.99,,"carne de novilho (95%), sal, especiarias",19.5
+2026-06-01,Loja A,5600000000024,Marca Exemplo,Hambúrguer de novilho 4 un,4 x 100 g,3.99,,"carne de novilho (80%), água, fibra vegetal, sal, especiarias",15.8
+2026-03-02,Loja A,5600000000031,Marca Exemplo,Papel higiénico folha dupla,12 rolos,4.79,,,
+2026-06-01,Loja A,5600000000031,Marca Exemplo,Papel higiénico folha dupla,10 rolos,4.59,,,
+2026-03-02,Loja A,5600000000048,Marca Exemplo,Cereais de chocolate,375 g,2.99,,,
+2026-06-01,Loja A,5600000000055,Marca Exemplo,Cereais de chocolate novo formato,330 g,2.99,,,
+2026-03-02,Loja A,5600000000062,Marca Exemplo,Café moído intenso,250 g,3.49,,,
+2026-06-01,Loja A,5600000000062,Marca Exemplo,Café moído intenso,250 g,3.89,,,
+2026-03-02,Loja A,5600000000079,Marca Exemplo,Bolachas integrais,400 g,1.99,,,
+2026-06-01,Loja A,5600000000079,Marca Exemplo,Bolachas integrais,350 g,1.69,,,
+2026-03-02,Loja B,5600000000086,Outra Marca,Creme vegetal para barrar,500 g,2.29,,"óleos vegetais (59%), água, sal",
+2026-06-01,Loja B,5600000000086,Outra Marca,Creme vegetal para barrar,450 g,2.29,,"óleos vegetais (45%), água, sal",

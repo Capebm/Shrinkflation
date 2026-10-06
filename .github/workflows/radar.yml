@@ -1,0 +1,51 @@
+name: Radar semanal
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"   # segundas-feiras, 06:17 UTC
+  workflow_dispatch:
+    inputs:
+      paginas:
+        description: "Páginas do Open Food Facts por categoria (100 produtos cada)"
+        default: "10"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: radar
+  cancel-in-progress: false
+
+jobs:
+  recolher:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Testes
+        run: python -m unittest discover -s tests -t .
+      - name: Open Food Facts
+        run: python -m radar recolher off --paginas "${{ inputs.paginas || '10' }}"
+      - name: Lojas online (data/fontes/lojas.csv)
+        run: |
+          if [ "$(wc -l < data/fontes/lojas.csv)" -gt 1 ]; then
+            python -m radar recolher lojas
+          else
+            echo "Sem URLs em data/fontes/lojas.csv"
+          fi
+      - name: Detetar casos e gerar página
+        run: python -m radar detetar
+      - name: Guardar resultados
+        run: |
+          git config user.name "radar-bot"
+          git config user.email "radar-bot@users.noreply.github.com"
+          git add data/historico.jsonl data/vistos.json data/eventos.json site/radar.html
+          if git diff --cached --quiet; then
+            echo "Sem alterações"
+          else
+            git commit -m "Radar: recolha de $(date -u +%F)"
+            git push
+          fi

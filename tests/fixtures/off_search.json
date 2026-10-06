@@ -1,0 +1,10 @@
+{"count": 2, "page": 1, "page_size": 100, "products": [
+ {"code": "5601234567890", "product_name": "Chocolate de leite", "product_name_pt": "Chocolate de leite com avelãs",
+  "brands": "Marca Teste, Outra", "quantity": "90 g",
+  "ingredients_text_pt": "açúcar, avelãs (12%), manteiga de cacau, leite em pó 18%",
+  "ingredients": [{"text": "açúcar", "percent_estimate": 40}, {"text": "avelãs", "percent": 12}],
+  "nutriments": {"proteins_100g": 7.1, "fat_100g": 33, "sugars_100g": 52.5, "salt_100g": 0.2, "energy-kcal_100g": 545}},
+ {"code": "5609999999999", "product_name": "Bolachas", "brands": "Marca Teste",
+  "product_quantity": 0.4, "product_quantity_unit": "kg"},
+ {"product_name": "sem código"}
+]}
