@@ -135,6 +135,25 @@ class SourceTests(unittest.TestCase):
         self.assertIn("en%3Aportugal", urls[0])
         self.assertEqual((o.name, o.brand, o.amount, o.quid), ("Chocolate", "Marca Teste", 90, {"avelãs": 12.0}))
 
+    def test_ingredients_from_product_endpoint_are_cached(self):
+        hit = {"code": "5601234567890", "product_name": "Salsichas", "quantity": "200 g", "last_modified_t": 100}
+        product = {"product": {"ingredients_text_pt": "carne de porco (55%), água, sal"}}
+        calls = []
+
+        def fake(url):
+            calls.append(url)
+            return product if "/api/v2/product/" in url else {"hits": [hit], "page_count": 1}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "off_ingredientes.json"
+            [o], _ = off.collect(["en:sausages"], "2026-10-06", pause=0, get_json=fake, ingredient_cache=cache)
+            self.assertEqual(o.quid, {"carne de porco": 55.0})
+            off.collect(["en:sausages"], "2026-10-13", pause=0, get_json=fake, ingredient_cache=cache)
+            self.assertEqual(sum("/api/v2/product/" in u for u in calls), 1)  # unchanged product: cache hit
+            hit["last_modified_t"] = 200
+            off.collect(["en:sausages"], "2026-10-20", pause=0, get_json=fake, ingredient_cache=cache)
+            self.assertEqual(sum("/api/v2/product/" in u for u in calls), 2)
+
     def test_category_skipped_when_both_services_fail(self):
         def down(url):
             raise OSError("503")

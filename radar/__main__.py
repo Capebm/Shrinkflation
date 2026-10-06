@@ -65,7 +65,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{len(points)} preços em lojas portuguesas, {price_store.add(points)} novos gravados")
             return 0
         if args.fonte == "off":
-            obs, failed = off.collect(args.categorias, args.data, max_pages=args.paginas)
+            obs, failed = off.collect(args.categorias, args.data, max_pages=args.paginas,
+                                      ingredient_cache=args.dados / "off_ingredientes.json")
             if failed and len(failed) == len(args.categorias):
                 print("Open Food Facts indisponível para todas as categorias", file=sys.stderr)
                 return 1

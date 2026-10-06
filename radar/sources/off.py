@@ -11,12 +11,19 @@ search-a-licious source (app/_types.py, data/config/openfoodfacts.yml): Lucene
 query in ``q``, ``page``/``page_size`` (page * page_size <= 10 000), response
 ``{"hits": [...], "page_count": N}``; text fields come per language
 (``{"main": ..., "pt": ...}``).
+
+Search-a-licious hits carry no ingredient text (checked on a live response), so
+ingredients come from the product endpoint, one request per product, cached in
+data/off_ingredientes.json and only refetched when the product's
+``last_modified_t`` changes.
 """
 from __future__ import annotations
 
+import json
 import sys
 import time
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from urllib.parse import urlencode
 
 from ..composition import extract_quid, nutrition_from_off, quid_from_off
@@ -28,8 +35,10 @@ SEARCH_URL = "https://world.openfoodfacts.org/api/v2/search"
 SAL_URL = "https://search.openfoodfacts.org/search"
 SAL_FIELDS = ",".join([
     "code", "product_name", "brands", "quantity", "product_quantity", "product_quantity_unit",
-    "ingredients_text", "nutriments",
+    "ingredients_text", "nutriments", "last_modified_t",
 ])
+PRODUCT_URL = "https://world.openfoodfacts.org/api/v2/product/{code}"
+PRODUCT_FIELDS = "ingredients_text_pt,ingredients_text,ingredients"
 FIELDS = ",".join([
     "code", "product_name", "product_name_pt", "brands", "quantity", "product_quantity",
     "product_quantity_unit", "ingredients_text_pt", "ingredients_text", "ingredients", "nutriments",
@@ -73,13 +82,14 @@ def _from_sal_hit(hit: dict) -> dict:
     return {"code": hit.get("code"), "product_name": _lang(hit.get("product_name")), "brands": brands,
             "quantity": hit.get("quantity"), "product_quantity": hit.get("product_quantity"),
             "product_quantity_unit": hit.get("product_quantity_unit"),
-            "ingredients_text": _lang(hit.get("ingredients_text")), "nutriments": hit.get("nutriments")}
+            "ingredients_text": _lang(hit.get("ingredients_text")), "nutriments": hit.get("nutriments"),
+            "last_modified_t": hit.get("last_modified_t")}
 
 
 def search(category: str, *, max_pages: int = 10, page_size: int = 100, pause: float = 6.5,
            get_json: Callable[[str], dict] = http.get_json) -> Iterator[dict]:
     for page in range(1, max_pages + 1):
-        params = {"countries_tags": "en:portugal", "categories_tags": category, "fields": FIELDS,
+        params = {"countries_tags": "en:portugal", "categories_tags": category, "fields": FIELDS + ",last_modified_t",
                   "page_size": page_size, "page": page}
         data = get_json(f"{SEARCH_URL}?{urlencode(params)}")
         products = data.get("products") or []
@@ -110,11 +120,40 @@ def to_observation(p: dict, observed_at: str) -> Observation | None:
     return obs
 
 
+def add_ingredients(pairs: list[tuple[Observation, object]], cache_path: Path, *, pause: float = 0.7,
+                    get_json: Callable[[str], dict] = http.get_json) -> tuple[int, int]:
+    """Fill in ingredients and declared percentages. Returns (requests made, failures)."""
+    cache: dict[str, dict] = json.loads(cache_path.read_text(encoding="utf-8")) if cache_path.exists() else {}
+    fetched = failed = 0
+    for obs, modified in pairs:
+        if obs.ingredients:
+            continue
+        entry = cache.get(obs.ean)
+        if not entry or entry.get("t") != modified:
+            try:
+                product = get_json(PRODUCT_URL.format(code=obs.ean) + "?fields=" + PRODUCT_FIELDS).get("product") or {}
+            except Exception:
+                failed += 1
+                continue
+            fetched += 1
+            text = product.get("ingredients_text_pt") or product.get("ingredients_text") or ""
+            entry = cache[obs.ean] = {"t": modified, "text": text,
+                                      "quid": {**extract_quid(text), **quid_from_off(product.get("ingredients"))}}
+            if pause:
+                time.sleep(pause)
+        obs.ingredients = entry["text"] or None
+        obs.quid = entry["quid"]
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(json.dumps(cache, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+    return fetched, failed
+
+
 def collect(categories: list[str], observed_at: str, max_pages: int = 10,
-            get_json: Callable[[str], dict] = http.get_json, pause: float = 6.5
-            ) -> tuple[list[Observation], list[str]]:
+            get_json: Callable[[str], dict] = http.get_json, pause: float = 6.5,
+            ingredient_cache: Path | None = None) -> tuple[list[Observation], list[str]]:
     """Return the observations and the categories that could not be read from either service."""
     seen: dict[str, Observation] = {}
+    modified: dict[str, object] = {}
     failed: list[str] = []
     for category in categories:
         products = None
@@ -132,4 +171,9 @@ def collect(categories: list[str], observed_at: str, max_pages: int = 10,
             obs = to_observation(product, observed_at)
             if obs and obs.ean not in seen:
                 seen[obs.ean] = obs
+                modified[obs.ean] = product.get("last_modified_t")
+    if ingredient_cache is not None:
+        fetched, errors = add_ingredients([(o, modified[o.ean]) for o in seen.values()], ingredient_cache,
+                                          get_json=get_json, pause=min(pause, 0.7))
+        print(f"ingredientes: {fetched} pedidos ao Open Food Facts, {errors} falhas", file=sys.stderr)
     return list(seen.values()), failed
